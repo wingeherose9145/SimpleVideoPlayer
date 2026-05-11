@@ -2,11 +2,14 @@ package com.simple.player
 
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import com.simple.player.databinding.ActivityMainBinding
 import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,6 +19,42 @@ class MainActivity : AppCompatActivity() {
     private val videos = mutableListOf<File>()
     private var currentIndex = 0
 
+    private val pickVideos =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+
+            uris.forEach { uri ->
+
+                val name = getFileName(uri)
+
+                if (name != null) {
+
+                    val dir = File(filesDir, "videos")
+
+                    if (!dir.exists()) {
+                        dir.mkdirs()
+                    }
+
+                    val destFile = File(dir, name)
+
+                    contentResolver.openInputStream(uri)?.use { input ->
+
+                        FileOutputStream(destFile).use { output ->
+
+                            input.copyTo(output)
+                        }
+                    }
+                }
+            }
+
+            loadVideos()
+
+            if (videos.isNotEmpty()) {
+
+                currentIndex = 0
+                playVideo(videos[currentIndex])
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -23,14 +62,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         player = ExoPlayer.Builder(this).build()
+
         binding.playerView.player = player
 
         loadVideos()
 
+        if (videos.isNotEmpty()) {
+            playVideo(videos[currentIndex])
+        }
+
         binding.btnPlay.setOnClickListener {
+
             if (player.isPlaying) {
+
                 player.pause()
+
             } else {
+
                 player.play()
             }
         }
@@ -43,12 +91,16 @@ class MainActivity : AppCompatActivity() {
             prevVideo()
         }
 
-        if (videos.isNotEmpty()) {
-            playVideo(videos[0])
+        binding.btnImport.setOnClickListener {
+
+            pickVideos.launch(
+                arrayOf("video/*")
+            )
         }
     }
 
     private fun loadVideos() {
+
         val dir = File(filesDir, "videos")
 
         if (!dir.exists()) {
@@ -58,19 +110,26 @@ class MainActivity : AppCompatActivity() {
         videos.clear()
 
         dir.listFiles()?.forEach {
-            videos.add(it)
+
+            if (it.isFile) {
+                videos.add(it)
+            }
         }
     }
 
     private fun playVideo(file: File) {
+
         val mediaItem = MediaItem.fromUri(Uri.fromFile(file))
 
         player.setMediaItem(mediaItem)
+
         player.prepare()
+
         player.play()
     }
 
     private fun nextVideo() {
+
         if (videos.isEmpty()) return
 
         currentIndex++
@@ -83,6 +142,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prevVideo() {
+
         if (videos.isEmpty()) return
 
         currentIndex--
@@ -94,8 +154,39 @@ class MainActivity : AppCompatActivity() {
         playVideo(videos[currentIndex])
     }
 
+    private fun getFileName(uri: Uri): String? {
+
+        var name: String? = null
+
+        val cursor = contentResolver.query(
+            uri,
+            null,
+            null,
+            null,
+            null
+        )
+
+        cursor?.use {
+
+            if (it.moveToFirst()) {
+
+                val index =
+                    it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+
+                if (index >= 0) {
+
+                    name = it.getString(index)
+                }
+            }
+        }
+
+        return name
+    }
+
     override fun onDestroy() {
+
         super.onDestroy()
+
         player.release()
     }
 }
