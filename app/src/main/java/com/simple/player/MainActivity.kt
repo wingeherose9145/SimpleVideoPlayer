@@ -14,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.simple.player.databinding.ActivityMainBinding
 import java.io.File
 import java.io.FileOutputStream
@@ -43,39 +44,35 @@ class MainActivity : AppCompatActivity() {
         player = ExoPlayer.Builder(this).build()
         binding.playerView.player = player
 
-        loadVideos()
-
-        // ⭐关键：强制控制器可用
         binding.playerView.useController = true
 
-        // ⭐关键：自动显示进度条
-        binding.playerView.showController()
+        loadVideos()
 
-        binding.playerView.setControllerVisibilityListener {
-            handler.removeCallbacks(hideRunnable)
-            handler.postDelayed(hideRunnable, 2000)
-        }
+        // ⭐ 关键：统一控制器监听（解决重载冲突）
+        binding.playerView.setControllerVisibilityListener(
+            PlayerView.ControllerVisibilityListener { visibility ->
+                handler.removeCallbacks(hideRunnable)
+                handler.postDelayed(hideRunnable, 1800)
+            }
+        )
 
-        // 横竖屏控制（稳定版）
+        // 横竖屏适配（稳定版）
         player.addListener(object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: VideoSize) {
-
-                val isLandscape = videoSize.width > videoSize.height
-
                 requestedOrientation =
-                    if (isLandscape)
+                    if (videoSize.width > videoSize.height)
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     else
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             }
         })
 
-        // 点击显示控制
+        // 点击显示控制层
         binding.playerView.setOnClickListener {
             binding.playerView.showController()
         }
 
-        // 滑动进度
+        // 手势快进
         binding.playerView.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> startX = event.x
@@ -83,7 +80,7 @@ class MainActivity : AppCompatActivity() {
                     val delta = event.x - startX
                     if (abs(delta) > 120) {
                         player.seekTo(
-                            player.currentPosition + (delta * 100).toLong()
+                            player.currentPosition + (delta * 120).toLong()
                         )
                     }
                 }
@@ -98,19 +95,48 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnNext.setOnClickListener {
             next()
-            binding.playerView.showController()
         }
 
         binding.btnPrev.setOnClickListener {
             prev()
-            binding.playerView.showController()
         }
 
         binding.btnImport.setOnClickListener {
             pick.launch(arrayOf("video/*"))
         }
+    }
 
-        // ⭐关键：不要自动播放
+    // ⭐ 核心播放函数（稳定版）
+    private fun playAt(i: Int) {
+
+        if (videos.isEmpty()) return
+
+        index = i
+
+        val file = videos[index]
+
+        val item = MediaItem.fromUri(Uri.fromFile(file))
+
+        player.stop()
+        player.clearMediaItems()
+
+        player.setMediaItem(item)
+        player.prepare()
+        player.play()
+
+        binding.playerView.showController()
+    }
+
+    private fun next() {
+        if (videos.isEmpty()) return
+        index = (index + 1) % videos.size
+        playAt(index)
+    }
+
+    private fun prev() {
+        if (videos.isEmpty()) return
+        index = if (index - 1 < 0) videos.size - 1 else index - 1
+        playAt(index)
     }
 
     private val pick =
@@ -133,39 +159,6 @@ class MainActivity : AppCompatActivity() {
 
             loadVideos()
         }
-
-    // ⭐核心修复函数（重点）
-    private fun play(index: Int) {
-
-        if (videos.isEmpty()) return
-
-        this.index = index
-
-        val file = videos[index]
-
-        val item = MediaItem.fromUri(Uri.fromFile(file))
-
-        player.stop()              // ⭐必须
-        player.clearMediaItems()   // ⭐必须
-
-        player.setMediaItem(item)
-        player.prepare()
-        player.play()
-
-        binding.playerView.showController() // ⭐解决进度条问题
-    }
-
-    private fun next() {
-        if (videos.isEmpty()) return
-        index = (index + 1) % videos.size
-        play(index)
-    }
-
-    private fun prev() {
-        if (videos.isEmpty()) return
-        index = if (index - 1 < 0) videos.size - 1 else index - 1
-        play(index)
-    }
 
     private fun loadVideos() {
         val dir = File(filesDir, "videos")
