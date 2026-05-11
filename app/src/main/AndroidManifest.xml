@@ -1,64 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#000000">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 播放器 -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/playerView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:keepScreenOn="true"
-        app:use_controller="true"
-        app:controller_auto_show="false"
-        app:controller_show_timeout="1200"
-        app:resize_mode="fit" />
+    <application
+        android:label="SimplePlayer"
+        android:allowBackup="true"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
 
-    <!-- 上一条 -->
-    <ImageButton
-        android:id="@+id/btnPrev"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_gravity="start|center_vertical"
-        android:layout_margin="12dp"
-        android:background="#0FFFFFFF"
-        android:alpha="0.45"
-        android:src="@android:drawable/ic_media_previous" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
 
-    <!-- 播放/暂停 -->
-    <ImageButton
-        android:id="@+id/btnPlay"
-        android:layout_width="72dp"
-        android:layout_height="72dp"
-        android:layout_gravity="center"
-        android:background="#0FFFFFFF"
-        android:alpha="0.5"
-        android:src="@android:drawable/ic_media_play" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
 
-    <!-- 下一条 -->
-    <ImageButton
-        android:id="@+id/btnNext"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_gravity="end|center_vertical"
-        android:layout_margin="12dp"
-        android:background="#0FFFFFFF"
-        android:alpha="0.45"
-        android:src="@android:drawable/ic_media_next" />
+        </activity>
 
-    <!-- 导入 -->
-    <ImageButton
-        android:id="@+id/btnImport"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_gravity="top|end"
-        android:layout_margin="16dp"
-        android:background="#0FFFFFFF"
-        android:alpha="0.4"
-        android:src="@android:drawable/ic_input_add" />
+    </application>
 
-</FrameLayout>
+</manifest>
