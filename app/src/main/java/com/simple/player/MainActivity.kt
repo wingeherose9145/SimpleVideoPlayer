@@ -25,7 +25,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
 
     private val videos = mutableListOf<File>()
-
     private var currentIndex = 0
 
     private val handler = Handler(Looper.getMainLooper())
@@ -37,151 +36,92 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val pickVideos =
-        registerForActivityResult(
-            ActivityResultContracts.OpenMultipleDocuments()
-        ) { uris ->
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
 
             uris.forEach { uri ->
 
-                val name = getFileName(uri)
+                val name = getFileName(uri) ?: return@forEach
 
-                if (name != null) {
+                val dir = File(filesDir, "videos")
+                if (!dir.exists()) dir.mkdirs()
 
-                    val dir = File(filesDir, "videos")
+                val dest = File(dir, name)
 
-                    if (!dir.exists()) {
-                        dir.mkdirs()
-                    }
-
-                    val destFile = File(dir, name)
-
-                    contentResolver.openInputStream(uri)?.use { input ->
-
-                        FileOutputStream(destFile).use { output ->
-
-                            input.copyTo(output)
-                        }
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(dest).use { output ->
+                        input.copyTo(output)
                     }
                 }
             }
 
             loadVideos()
-
-            if (videos.isNotEmpty()) {
-
-                currentIndex = 0
-
-                playVideo(videos[currentIndex])
-            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
-
         setContentView(binding.root)
 
         player = ExoPlayer.Builder(this).build()
-
         binding.playerView.player = player
 
         loadVideos()
 
-        if (videos.isNotEmpty()) {
-
-            playVideo(videos[currentIndex])
-        }
-
         hideControls()
 
+        // 横竖屏自动适配
         player.addListener(object : Player.Listener {
-
             override fun onVideoSizeChanged(videoSize: VideoSize) {
-
-                val width = videoSize.width
-
-                val height = videoSize.height
-
-                if (width > height) {
-
-                    requestedOrientation =
+                requestedOrientation =
+                    if (videoSize.width > videoSize.height)
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-
-                } else {
-
-                    requestedOrientation =
+                    else
                         ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                }
             }
         })
 
+        // 点击显示控制层
         binding.playerView.setOnClickListener {
-
             showControls()
         }
 
+        // 手势快进
         binding.playerView.setOnTouchListener { _, event ->
-
             when (event.action) {
-
-                MotionEvent.ACTION_DOWN -> {
-
-                    startX = event.x
-                }
-
+                MotionEvent.ACTION_DOWN -> startX = event.x
                 MotionEvent.ACTION_UP -> {
-
-                    val deltaX = event.x - startX
-
-                    if (abs(deltaX) > 150) {
-
-                        val seekPosition =
-                            player.currentPosition + (deltaX * 100)
-
-                        player.seekTo(seekPosition.toLong())
+                    val delta = event.x - startX
+                    if (abs(delta) > 150) {
+                        val seek = player.currentPosition + (delta * 120)
+                        player.seekTo(seek.toLong())
                     }
                 }
             }
-
             false
         }
 
+        // 播放
         binding.btnPlay.setOnClickListener {
-
-            if (player.isPlaying) {
-
-                player.pause()
-
-            } else {
-
-                player.play()
-            }
-
+            if (player.isPlaying) player.pause() else player.play()
             showControls()
         }
 
+        // 下一个
         binding.btnNext.setOnClickListener {
-
             nextVideo()
-
             showControls()
         }
 
+        // 上一个
         binding.btnPrev.setOnClickListener {
-
             prevVideo()
-
             showControls()
         }
 
+        // 导入
         binding.btnImport.setOnClickListener {
-
-            pickVideos.launch(
-                arrayOf("video/*")
-            )
-
+            pickVideos.launch(arrayOf("video/*"))
             showControls()
         }
     }
@@ -194,8 +134,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnImport.visibility = View.VISIBLE
 
         handler.removeCallbacks(hideControlsRunnable)
-
-        handler.postDelayed(hideControlsRunnable, 2000)
+        handler.postDelayed(hideControlsRunnable, 1500)
     }
 
     private fun hideControls() {
@@ -209,113 +148,59 @@ class MainActivity : AppCompatActivity() {
     private fun loadVideos() {
 
         val dir = File(filesDir, "videos")
-
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
+        if (!dir.exists()) dir.mkdirs()
 
         videos.clear()
-
-        dir.listFiles()?.forEach {
-
-            if (it.isFile) {
-
-                videos.add(it)
-            }
-        }
+        dir.listFiles()?.forEach { if (it.isFile) videos.add(it) }
     }
 
     private fun playVideo(file: File) {
 
-        val mediaItem = MediaItem.fromUri(
-            Uri.fromFile(file)
-        )
+        val item = MediaItem.fromUri(Uri.fromFile(file))
 
-        player.setMediaItem(mediaItem)
+        player.stop()
+        player.clearMediaItems()
 
+        player.setMediaItem(item)
         player.prepare()
-
         player.play()
     }
 
     private fun nextVideo() {
-
         if (videos.isEmpty()) return
-
-        currentIndex++
-
-        if (currentIndex >= videos.size) {
-
-            currentIndex = 0
-        }
-
+        currentIndex = (currentIndex + 1) % videos.size
         playVideo(videos[currentIndex])
     }
 
     private fun prevVideo() {
-
         if (videos.isEmpty()) return
-
-        currentIndex--
-
-        if (currentIndex < 0) {
-
-            currentIndex = videos.size - 1
-        }
-
+        currentIndex = if (currentIndex - 1 < 0) videos.size - 1 else currentIndex - 1
         playVideo(videos[currentIndex])
     }
 
     private fun getFileName(uri: Uri): String? {
-
         var name: String? = null
-
-        val cursor =
-            contentResolver.query(
-                uri,
-                null,
-                null,
-                null,
-                null
-            )
-
-        cursor?.use {
-
+        contentResolver.query(uri, null, null, null, null)?.use {
             if (it.moveToFirst()) {
-
-                val index =
-                    it.getColumnIndex(
-                        OpenableColumns.DISPLAY_NAME
-                    )
-
-                if (index >= 0) {
-
-                    name = it.getString(index)
-                }
+                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) name = it.getString(index)
             }
         }
-
         return name
     }
 
     override fun onPause() {
-
         super.onPause()
-
         player.pause()
     }
 
     override fun onStop() {
-
         super.onStop()
-
         player.pause()
     }
 
     override fun onDestroy() {
-
         super.onDestroy()
-
         player.release()
     }
 }
